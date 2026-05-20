@@ -82,9 +82,23 @@ export function App() {
                 Escrow, DAO arbitration, Walrus evidence, and USDC settlement for merchants that do not want to manage Web3 primitives.
               </p>
             </div>
-            <Button disabled={createOrderMutation.isPending} onClick={() => createOrderMutation.mutate()}>
-              Create protected order
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <a
+                className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-950 hover:bg-slate-50"
+                href="http://localhost:5180"
+              >
+                Checkout home
+              </a>
+              <a
+                className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-950 hover:bg-slate-50"
+                href="/docs"
+              >
+                Docs
+              </a>
+              <Button disabled={createOrderMutation.isPending} onClick={() => createOrderMutation.mutate()}>
+                Create protected order
+              </Button>
+            </div>
           </header>
 
           <div className="mt-6 grid gap-4 md:grid-cols-4">

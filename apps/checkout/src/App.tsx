@@ -6,6 +6,7 @@ import type { TokenSymbol } from "@suitrustpay/shared";
 import {
   confirmPayment,
   createDispute,
+  createDemoOrder,
   createPaymentIntent,
   createQuote,
   getCheckoutConfig,
@@ -21,8 +22,13 @@ function orderIdFromPath(): string {
   return "ord_demo";
 }
 
+function isCheckoutRoute(): boolean {
+  return window.location.pathname.split("/")[1] === "checkout";
+}
+
 export function App() {
   const orderId = orderIdFromPath();
+  const isCheckout = isCheckoutRoute();
   const account = useCurrentAccount();
   const selectedToken = useCheckoutStore((state) => state.selectedToken);
   const setSelectedToken = useCheckoutStore((state) => state.setSelectedToken);
@@ -30,7 +36,18 @@ export function App() {
   const [refundReason, setRefundReason] = useState("Service was not delivered as promised");
 
   const configQuery = useQuery({ queryKey: ["checkout-config"], queryFn: getCheckoutConfig });
-  const orderQuery = useQuery({ queryKey: ["order", orderId], queryFn: () => getOrder(orderId), retry: false });
+  const orderQuery = useQuery({
+    queryKey: ["order", orderId],
+    queryFn: () => getOrder(orderId),
+    retry: false,
+    enabled: isCheckout,
+  });
+  const homeOrderMutation = useMutation({
+    mutationFn: createDemoOrder,
+    onSuccess: (order) => {
+      window.location.href = new URL(order.checkoutUrl).pathname;
+    },
+  });
   const quoteQuery = useQuery({
     queryKey: ["quote", orderId, selectedToken],
     queryFn: () => createQuote({ orderId, inputToken: selectedToken, slippageBps: 50 }),
@@ -74,6 +91,66 @@ export function App() {
   const quote = quoteQuery.data;
   const isEscrowed = confirmMutation.data || order?.status === "escrowed";
 
+  if (!isCheckout) {
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <div className="mx-auto grid min-h-screen max-w-6xl gap-8 px-5 py-8 lg:grid-cols-[1fr_420px] lg:items-center">
+          <section>
+            <p className="text-sm font-semibold uppercase tracking-normal text-sky-700">SuiTrustPay</p>
+            <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight md:text-6xl">
+              On-chain trusted commerce for Sui.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+              Launch a hosted checkout, lock funds in escrow, and manage refund proposals with Walrus evidence and DAO-style voting.
+            </p>
+            <div className="mt-8 grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">Testnet checkout</div>
+              <div className="rounded-lg border border-slate-200 bg-white p-4">Merchant dashboard</div>
+              <div className="rounded-lg border border-slate-200 bg-white p-4">Dispute management</div>
+            </div>
+          </section>
+
+          <Panel className="space-y-4">
+            <div>
+              <p className="text-sm text-slate-500">Demo paths</p>
+              <h2 className="mt-2 text-2xl font-semibold">Start recording here</h2>
+            </div>
+            <Button
+              className="w-full"
+              disabled={homeOrderMutation.isPending}
+              onClick={() => homeOrderMutation.mutate()}
+            >
+              {homeOrderMutation.isPending ? "Creating demo order..." : "Create demo checkout"}
+            </Button>
+            <a
+              className="flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-950 hover:bg-slate-50"
+              href="http://localhost:5181"
+            >
+              Open merchant dashboard
+            </a>
+            <a
+              className="flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              href="https://suipaykit.com"
+            >
+              Project website placeholder
+            </a>
+            {homeOrderMutation.error ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {homeOrderMutation.error.message}
+              </div>
+            ) : null}
+            <div className="rounded-lg bg-slate-950 p-4 text-sm text-white">
+              <p className="font-medium">Recording flow</p>
+              <p className="mt-2 text-slate-300">
+                {"Create checkout -> connect wallet -> lock escrow -> open refund proposal -> manage it in Dashboard."}
+              </p>
+            </div>
+          </Panel>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <div className="mx-auto grid min-h-screen max-w-6xl gap-8 px-5 py-8 lg:grid-cols-[1fr_420px] lg:items-center">
@@ -106,7 +183,10 @@ export function App() {
           <div className="space-y-5 p-5">
             {orderQuery.isError ? (
               <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                Order not found. Create one from the API or dashboard first.
+                <p>Order not found. The API uses in-memory demo data, so old checkout links expire after restart.</p>
+                <a className="mt-3 inline-flex font-medium text-red-800 underline" href="/">
+                  Create a fresh demo checkout
+                </a>
               </div>
             ) : null}
 

@@ -22,6 +22,15 @@ export async function getCheckoutConfig(): Promise<{
   return get("/v1/checkout/config");
 }
 
+export async function createDemoOrder(): Promise<Order> {
+  return post("/v1/orders", {
+    amount: 1,
+    currency: "USDC",
+    protectionWindow: "15m",
+    metadata: { source: "checkout-home", product: "Sui Overflow demo" },
+  });
+}
+
 export async function getOrder(orderId: string): Promise<Order> {
   return get(`/v1/orders/${orderId}`);
 }
