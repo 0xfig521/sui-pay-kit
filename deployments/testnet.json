@@ -1,0 +1,21 @@
+{
+  "project": "SuiTrustPay",
+  "network": "testnet",
+  "chainId": "4c78adac",
+  "module": "suitrustpay::trust_protocol",
+  "packageId": "0xf63c56f580f19106921e01e06366e02b14a91aa7ced82380c3e515ef3e150547",
+  "originalPackageId": "0xf63c56f580f19106921e01e06366e02b14a91aa7ced82380c3e515ef3e150547",
+  "publishedVersion": 1,
+  "publishDigest": "75mqZBodZBEzZ4p29M6u8t4ufjm26m3os2e9GjgTnN8d",
+  "publisher": "0x366c943c11a541396fe586f8179a6fd1c237064b9bfd44cb7efd7255dad91314",
+  "protocolConfigObjectId": "0xc157aa52e56e8cb4c6bf685d0efe20266f3a1c424d241cbb5961d504540cfb9a",
+  "protocolConfigInitialSharedVersion": "867882420",
+  "adminCapObjectId": "0xfd1cb54cfdec203b007b5ddf77a0c15a5322634ee11240785d614d275823cda0",
+  "upgradeCapObjectId": "0x10e32dcc6ab66101e80fd659a7ee37857d6b1b22aaab445739c09107959808d2",
+  "defaultSettlementCoinType": "0x2::sui::SUI",
+  "defaultSettlementCoinObjectId": "gas",
+  "notes": [
+    "Testnet default settlement coin uses SUI split from the connected wallet gas coin for end-to-end wallet execution.",
+    "Set SUI_SETTLEMENT_COIN_TYPE and SUI_SETTLEMENT_COIN_OBJECT_ID to a USDC coin before real USDC settlement testing."
+  ]
+}

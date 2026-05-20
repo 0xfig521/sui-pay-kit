@@ -1,0 +1,30 @@
+{
+  "name": "suitrustpay",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.12",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter './apps/*' dev",
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:checkout": "bun run --cwd apps/checkout dev",
+    "dev:dashboard": "bun run --cwd apps/dashboard dev",
+    "build": "bun run --filter './packages/*' build && bun run --filter './apps/*' build",
+    "build:protocol": "cd packages/protocol && sui move build",
+    "test:chain": "bun run --cwd packages/chain test",
+    "test:protocol": "cd packages/protocol && sui move test",
+    "typecheck": "bun run --filter './packages/*' typecheck && bun run --filter './apps/*' typecheck",
+    "lint": "bun run typecheck"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6"
+  }
+}

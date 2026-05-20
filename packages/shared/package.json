@@ -1,0 +1,18 @@
+{
+  "name": "@suitrustpay/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
