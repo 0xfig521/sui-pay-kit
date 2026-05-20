@@ -56,6 +56,10 @@ export async function createDemoOrder(amount: number): Promise<Order> {
   return payload as Order;
 }
 
+export async function createTestnetDaoCase(): Promise<Dispute> {
+  return post("/v1/dao/testnet-case", {});
+}
+
 export async function submitEvidence(input: SubmitEvidenceInput): Promise<Evidence> {
   return post("/v1/evidence", input);
 }

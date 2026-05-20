@@ -10,18 +10,33 @@ import {
   Link2,
   Scale,
   ShieldCheck,
+  UsersRound,
   WalletCards,
   Webhook,
 } from "lucide-react";
-import { castVote, createDemoOrder, getDashboardSummary, resolveDispute, startVoting, submitEvidence } from "./api";
+import {
+  castVote,
+  createDemoOrder,
+  createTestnetDaoCase,
+  getDashboardSummary,
+  resolveDispute,
+  startVoting,
+  submitEvidence,
+} from "./api";
 
 export function App() {
   const queryClient = useQueryClient();
   const [evidenceByDispute, setEvidenceByDispute] = useState<Record<string, string>>({});
+  const [jurorByDispute, setJurorByDispute] = useState<Record<string, string>>({});
   const summaryQuery = useQuery({ queryKey: ["dashboard-summary"], queryFn: getDashboardSummary });
   const refreshSummary = () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+  const isDaoRoute = window.location.pathname === "/dao";
   const createOrderMutation = useMutation({
     mutationFn: () => createDemoOrder(25),
+    onSuccess: refreshSummary,
+  });
+  const createCaseMutation = useMutation({
+    mutationFn: createTestnetDaoCase,
     onSuccess: refreshSummary,
   });
   const evidenceMutation = useMutation({
@@ -41,7 +56,7 @@ export function App() {
   });
   const voteMutation = useMutation({
     mutationFn: ({ disputeId, vote }: { disputeId: string; vote: "refund" | "merchant" }) =>
-      castVote({ disputeId, juror: "0xneutral_juror_1", vote }),
+      castVote({ disputeId, juror: jurorByDispute[disputeId] ?? "0xneutral_juror_1", vote }),
     onSuccess: refreshSummary,
   });
   const resolveMutation = useMutation({
@@ -49,6 +64,214 @@ export function App() {
     onSuccess: refreshSummary,
   });
   const summary = summaryQuery.data;
+
+  if (isDaoRoute) {
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-950">
+        <div className="mx-auto max-w-7xl px-5 py-6">
+          <header className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-normal text-sky-700">SuiTrustPay DAO Court</p>
+              <h1 className="mt-2 text-3xl font-semibold">Testnet dispute operations</h1>
+              <p className="mt-2 max-w-3xl text-slate-600">
+                Manage refund proposals from evidence intake to juror vote and final escrow ruling.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-950 hover:bg-slate-50" href="/">
+                Dashboard
+              </a>
+              <Button disabled={createCaseMutation.isPending} onClick={() => createCaseMutation.mutate()}>
+                {createCaseMutation.isPending ? "Creating case..." : "Create testnet court case"}
+              </Button>
+            </div>
+          </header>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-4">
+            <Stat label="Open cases" tone="warning" value={(summary?.disputes ?? []).filter((item) => item.status !== "resolved").length} />
+            <Stat label="Resolved cases" value={(summary?.disputes ?? []).filter((item) => item.status === "resolved").length} />
+            <Stat label="Evidence records" value={(summary?.disputes ?? []).reduce((total, item) => total + item.evidence.length, 0)} />
+            <Stat label="Jurors per case" value="11" />
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+            <section className="space-y-4">
+              {(summary?.disputes ?? []).map((dispute) => (
+                <Panel className="space-y-4" key={dispute.id}>
+                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-mono text-sm font-semibold">{dispute.id}</h2>
+                        <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">{dispute.status}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">{dispute.reason}</p>
+                      <p className="mt-2 font-mono text-xs text-slate-500">Order {dispute.orderId} / Escrow {dispute.escrowId}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs md:w-64">
+                      <div className="rounded-md bg-slate-50 p-2">
+                        <p className="text-slate-500">Evidence</p>
+                        <p className="mt-1 font-semibold">{dispute.evidence.length}</p>
+                      </div>
+                      <div className="rounded-md bg-emerald-50 p-2">
+                        <p className="text-emerald-700">Refund</p>
+                        <p className="mt-1 font-semibold">{dispute.refundVotes}</p>
+                      </div>
+                      <div className="rounded-md bg-sky-50 p-2">
+                        <p className="text-sky-700">Merchant</p>
+                        <p className="mt-1 font-semibold">{dispute.merchantVotes}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 text-xs md:grid-cols-4">
+                    {["proposed", "evidence", "voting", "resolved"].map((step) => (
+                      <div
+                        className={`rounded-md border p-3 ${
+                          dispute.status === step ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-500"
+                        }`}
+                        key={step}
+                      >
+                        {step}
+                      </div>
+                    ))}
+                  </div>
+
+                  {dispute.status === "evidence" ? (
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+                      <input
+                        className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                        onChange={(event) =>
+                          setEvidenceByDispute((current) => ({ ...current, [dispute.id]: event.target.value }))
+                        }
+                        placeholder="Walrus blob ID"
+                        value={evidenceByDispute[dispute.id] ?? ""}
+                      />
+                      <Button disabled={evidenceMutation.isPending} onClick={() => evidenceMutation.mutate(dispute.id)} variant="secondary">
+                        Submit evidence
+                      </Button>
+                      <Button disabled={startVotingMutation.isPending || dispute.evidence.length === 0} onClick={() => startVotingMutation.mutate(dispute.id)}>
+                        Start voting
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {dispute.status === "voting" ? (
+                    <div className="space-y-3">
+                      <select
+                        className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                        onChange={(event) =>
+                          setJurorByDispute((current) => ({ ...current, [dispute.id]: event.target.value }))
+                        }
+                        value={jurorByDispute[dispute.id] ?? "0xneutral_juror_1"}
+                      >
+                        {dispute.jury.map((juror) => (
+                          <option key={juror.address} value={juror.address}>
+                            {juror.role} / {juror.address} / rep {juror.reputationScore}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Button disabled={voteMutation.isPending} onClick={() => voteMutation.mutate({ disputeId: dispute.id, vote: "refund" })} variant="secondary">
+                          Vote refund
+                        </Button>
+                        <Button disabled={voteMutation.isPending} onClick={() => voteMutation.mutate({ disputeId: dispute.id, vote: "merchant" })} variant="secondary">
+                          Vote merchant
+                        </Button>
+                        <Button disabled={resolveMutation.isPending || dispute.refundVotes + dispute.merchantVotes === 0} onClick={() => resolveMutation.mutate(dispute.id)}>
+                          Execute ruling
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <p className="text-sm font-medium">Jury pool</p>
+                      <div className="mt-2 max-h-44 overflow-auto rounded-md border border-slate-200">
+                        {dispute.jury.map((juror) => (
+                          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-xs last:border-b-0" key={juror.address}>
+                            <span className="capitalize text-slate-600">{juror.role}</span>
+                            <span className="truncate px-3 font-mono text-slate-500">{juror.address}</span>
+                            <span className="font-semibold">{juror.reputationScore}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Walrus evidence</p>
+                      <div className="mt-2 space-y-2">
+                        {dispute.evidence.map((evidence) => (
+                          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs" key={evidence.id}>
+                            <p className="font-mono text-slate-700">{evidence.walrusBlobId}</p>
+                            <p className="mt-1 font-mono text-slate-500">{evidence.contentHash}</p>
+                            <p className="mt-1 text-slate-500">Storage cost: {evidence.storageCost}</p>
+                          </div>
+                        ))}
+                        {dispute.evidence.length === 0 ? <p className="text-sm text-slate-500">No evidence submitted yet.</p> : null}
+                      </div>
+                    </div>
+                  </div>
+                </Panel>
+              ))}
+
+              {summary?.disputes.length === 0 ? (
+                <Panel className="text-center">
+                  <Gavel className="mx-auto text-slate-400" size={28} />
+                  <h2 className="mt-3 text-lg font-semibold">No DAO cases yet</h2>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
+                    Create a testnet court case to exercise evidence submission, jury voting, and settlement resolution.
+                  </p>
+                  <Button className="mt-4" disabled={createCaseMutation.isPending} onClick={() => createCaseMutation.mutate()}>
+                    Create testnet court case
+                  </Button>
+                </Panel>
+              ) : null}
+            </section>
+
+            <aside className="space-y-4">
+              <Panel>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={20} />
+                  <h2 className="text-lg font-semibold">Sui testnet</h2>
+                </div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div>
+                    <p className="text-slate-500">Package</p>
+                    <p className="break-all font-mono text-xs">0xf63c56f580f19106921e01e06366e02b14a91aa7ced82380c3e515ef3e150547</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">ProtocolConfig</p>
+                    <p className="break-all font-mono text-xs">0xc157aa52e56e8cb4c6bf685d0efe20266f3a1c424d241cbb5961d504540cfb9a</p>
+                  </div>
+                </div>
+              </Panel>
+              <Panel>
+                <div className="flex items-center gap-3">
+                  <UsersRound size={20} />
+                  <h2 className="text-lg font-semibold">Court policy</h2>
+                </div>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  <li>5 buyer-side jurors</li>
+                  <li>5 merchant-side jurors</li>
+                  <li>1 neutral juror</li>
+                  <li>Walrus blob ID and content hash required before voting</li>
+                </ul>
+              </Panel>
+              {(createCaseMutation.error || evidenceMutation.error || startVotingMutation.error || voteMutation.error || resolveMutation.error) ? (
+                <Panel className="border-red-200 bg-red-50 text-sm text-red-700">
+                  {createCaseMutation.error?.message ||
+                    evidenceMutation.error?.message ||
+                    startVotingMutation.error?.message ||
+                    voteMutation.error?.message ||
+                    resolveMutation.error?.message}
+                </Panel>
+              ) : null}
+            </aside>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -65,8 +288,17 @@ export function App() {
               </div>
             </div>
             <nav className="mt-8 space-y-1 text-sm">
-              {["Overview", "Orders", "Escrow", "Disputes", "Reputation", "Webhooks", "Developers"].map((item) => (
-                <a className="flex rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-white" href={`#${item.toLowerCase()}`} key={item}>
+              {[
+                ["Overview", "#overview"],
+                ["Orders", "#orders"],
+                ["Escrow", "#escrow"],
+                ["Disputes", "#disputes"],
+                ["DAO Court", "/dao"],
+                ["Reputation", "#reputation"],
+                ["Webhooks", "#webhooks"],
+                ["Developers", "#developers"],
+              ].map(([item, href]) => (
+                <a className="flex rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-white" href={href} key={item}>
                   {item}
                 </a>
               ))}
@@ -94,6 +326,12 @@ export function App() {
                 href="/docs"
               >
                 Docs
+              </a>
+              <a
+                className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-950 hover:bg-slate-50"
+                href="/dao"
+              >
+                DAO court
               </a>
               <Button disabled={createOrderMutation.isPending} onClick={() => createOrderMutation.mutate()}>
                 Create protected order
@@ -219,6 +457,9 @@ export function App() {
                 <Gavel size={20} />
                 <h2 className="text-lg font-semibold">DAO court</h2>
               </div>
+              <a className="mt-3 inline-flex text-sm font-medium text-sky-700" href="/dao">
+                Open DAO operations console
+              </a>
               <div className="mt-4 grid gap-3">
                 {(summary?.disputes ?? []).map((dispute) => (
                   <div className="rounded-md border border-slate-200 p-4 text-sm" key={dispute.id}>

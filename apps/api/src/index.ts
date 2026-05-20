@@ -18,6 +18,7 @@ import {
   confirmPayment,
   createDispute,
   createOrder,
+  createTestnetDaoCase,
   getOrder,
   getQuote,
   listDisputes,
@@ -112,6 +113,8 @@ app.post("/v1/disputes", zValidator("json", createDisputeSchema), (c) => {
 });
 
 app.get("/v1/disputes", (c) => c.json(listDisputes()));
+
+app.post("/v1/dao/testnet-case", (c) => c.json(createTestnetDaoCase(), 201));
 
 app.post("/v1/evidence", zValidator("json", submitEvidenceSchema), (c) => {
   try {

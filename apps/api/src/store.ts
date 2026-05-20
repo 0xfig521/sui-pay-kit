@@ -256,6 +256,47 @@ export function resolveDispute(input: ResolveDisputeInput): Dispute {
   return updated;
 }
 
+export function createTestnetDaoCase(): Dispute {
+  const order = createOrder({
+    amount: 3,
+    protectionWindow: "15m",
+    metadata: { source: "dao-court", caseType: "testnet-dispute" },
+  });
+  const payment: Payment = {
+    id: createId("pay"),
+    orderId: order.id,
+    inputToken: "SUI",
+    inputAmount: "0.714286",
+    settledAmount: order.amount,
+    txDigest: `0xtestnet_${createId("tx").replace("tx_", "")}`,
+    payer: "0xbuyer_testnet_dao_case",
+    createdAt: new Date().toISOString(),
+  };
+  const escrow: Escrow = {
+    id: createId("esc"),
+    orderId: order.id,
+    amountUsdc: order.amount,
+    buyer: payment.payer,
+    merchant: seedMerchant.walletAddress,
+    status: "disputed",
+    releaseTime: order.protectionDeadline,
+  };
+  payments.set(payment.id, payment);
+  escrows.set(escrow.id, escrow);
+  updateOrder({
+    ...order,
+    status: "escrowed",
+    txDigest: payment.txDigest,
+    escrowId: escrow.id,
+  });
+  saveWebhookEvent("order.escrowed", order.id, order.amount);
+  return createDispute({
+    orderId: order.id,
+    buyer: payment.payer,
+    reason: "Buyer opened a refund proposal for an undelivered testnet service.",
+  });
+}
+
 export function listReputationProfiles(): ReputationProfile[] {
   return [
     {
