@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Panel, Stat } from "@suitrustpay/ui";
+import { useState } from "react";
 import {
   BadgeCheck,
   Copy,
@@ -12,14 +13,40 @@ import {
   WalletCards,
   Webhook,
 } from "lucide-react";
-import { createDemoOrder, getDashboardSummary } from "./api";
+import { castVote, createDemoOrder, getDashboardSummary, resolveDispute, startVoting, submitEvidence } from "./api";
 
 export function App() {
   const queryClient = useQueryClient();
+  const [evidenceByDispute, setEvidenceByDispute] = useState<Record<string, string>>({});
   const summaryQuery = useQuery({ queryKey: ["dashboard-summary"], queryFn: getDashboardSummary });
+  const refreshSummary = () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
   const createOrderMutation = useMutation({
     mutationFn: () => createDemoOrder(25),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+    onSuccess: refreshSummary,
+  });
+  const evidenceMutation = useMutation({
+    mutationFn: (disputeId: string) =>
+      submitEvidence({
+        disputeId,
+        submitter: summary?.merchant.walletAddress ?? "0xmerchant_demo",
+        walrusBlobId: evidenceByDispute[disputeId] || `walrus_demo_${disputeId}`,
+        contentHash: `sha256_${disputeId}`,
+        storageCost: "1000",
+      }),
+    onSuccess: refreshSummary,
+  });
+  const startVotingMutation = useMutation({
+    mutationFn: (disputeId: string) => startVoting({ disputeId }),
+    onSuccess: refreshSummary,
+  });
+  const voteMutation = useMutation({
+    mutationFn: ({ disputeId, vote }: { disputeId: string; vote: "refund" | "merchant" }) =>
+      castVote({ disputeId, juror: "0xneutral_juror_1", vote }),
+    onSuccess: refreshSummary,
+  });
+  const resolveMutation = useMutation({
+    mutationFn: (disputeId: string) => resolveDispute({ disputeId }),
+    onSuccess: refreshSummary,
   });
   const summary = summaryQuery.data;
 
@@ -186,11 +213,94 @@ export function App() {
                       <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">{dispute.status}</span>
                     </div>
                     <p className="mt-2 text-slate-600">{dispute.reason}</p>
-                    <p className="mt-2 text-xs text-slate-500">Jury: 5 buyers, 5 merchants, 1 neutral</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div className="rounded-md bg-slate-50 p-2">
+                        <p className="text-slate-500">Evidence</p>
+                        <p className="mt-1 font-semibold">{dispute.evidence.length}</p>
+                      </div>
+                      <div className="rounded-md bg-emerald-50 p-2">
+                        <p className="text-emerald-700">Refund</p>
+                        <p className="mt-1 font-semibold">{dispute.refundVotes}</p>
+                      </div>
+                      <div className="rounded-md bg-sky-50 p-2">
+                        <p className="text-sky-700">Merchant</p>
+                        <p className="mt-1 font-semibold">{dispute.merchantVotes}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">Jury: 5 buyers, 5 merchants, 1 neutral</p>
+
+                    {dispute.status === "evidence" ? (
+                      <div className="mt-3 space-y-2">
+                        <input
+                          className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500"
+                          onChange={(event) =>
+                            setEvidenceByDispute((current) => ({ ...current, [dispute.id]: event.target.value }))
+                          }
+                          placeholder="Walrus blob ID"
+                          value={evidenceByDispute[dispute.id] ?? ""}
+                        />
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <Button
+                            disabled={evidenceMutation.isPending}
+                            onClick={() => evidenceMutation.mutate(dispute.id)}
+                            variant="secondary"
+                          >
+                            Submit evidence
+                          </Button>
+                          <Button
+                            disabled={startVotingMutation.isPending || dispute.evidence.length === 0}
+                            onClick={() => startVotingMutation.mutate(dispute.id)}
+                          >
+                            Start voting
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {dispute.status === "voting" ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <Button
+                          disabled={voteMutation.isPending}
+                          onClick={() => voteMutation.mutate({ disputeId: dispute.id, vote: "refund" })}
+                          variant="secondary"
+                        >
+                          Vote refund
+                        </Button>
+                        <Button
+                          disabled={voteMutation.isPending}
+                          onClick={() => voteMutation.mutate({ disputeId: dispute.id, vote: "merchant" })}
+                          variant="secondary"
+                        >
+                          Vote merchant
+                        </Button>
+                        <Button disabled={resolveMutation.isPending} onClick={() => resolveMutation.mutate(dispute.id)}>
+                          Execute ruling
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {dispute.evidence.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {dispute.evidence.map((evidence) => (
+                          <div className="rounded-md bg-slate-50 p-2 text-xs" key={evidence.id}>
+                            <p className="font-mono text-slate-700">{evidence.walrusBlobId}</p>
+                            <p className="mt-1 text-slate-500">{evidence.contentHash}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
                 {summary?.disputes.length === 0 ? <p className="text-sm text-slate-500">No refund proposals opened.</p> : null}
               </div>
+              {(evidenceMutation.error || startVotingMutation.error || voteMutation.error || resolveMutation.error) ? (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {evidenceMutation.error?.message ||
+                    startVotingMutation.error?.message ||
+                    voteMutation.error?.message ||
+                    resolveMutation.error?.message}
+                </div>
+              ) : null}
             </Panel>
           </div>
 

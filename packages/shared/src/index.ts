@@ -158,6 +158,20 @@ export const submitEvidenceSchema = z.object({
   storageCost: z.string(),
 });
 
+export const startVotingSchema = z.object({
+  disputeId: z.string(),
+});
+
+export const castVoteSchema = z.object({
+  disputeId: z.string(),
+  juror: z.string(),
+  vote: z.enum(["refund", "merchant"]),
+});
+
+export const resolveDisputeSchema = z.object({
+  disputeId: z.string(),
+});
+
 export const reputationProfileSchema = z.object({
   owner: z.string(),
   role: z.enum(["merchant", "buyer", "juror"]),
@@ -194,6 +208,9 @@ export type Evidence = z.infer<typeof evidenceSchema>;
 export type Dispute = z.infer<typeof disputeSchema>;
 export type CreateDisputeInput = z.infer<typeof createDisputeSchema>;
 export type SubmitEvidenceInput = z.infer<typeof submitEvidenceSchema>;
+export type StartVotingInput = z.infer<typeof startVotingSchema>;
+export type CastVoteInput = z.infer<typeof castVoteSchema>;
+export type ResolveDisputeInput = z.infer<typeof resolveDisputeSchema>;
 export type ReputationProfile = z.infer<typeof reputationProfileSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
 

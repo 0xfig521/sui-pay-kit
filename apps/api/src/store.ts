@@ -2,6 +2,7 @@ import {
   createId,
   type ConfirmPaymentInput,
   type CreateDisputeInput,
+  type CastVoteInput,
   type Dispute,
   type Escrow,
   type Evidence,
@@ -10,7 +11,9 @@ import {
   type Payment,
   type Quote,
   type ReputationProfile,
+  type ResolveDisputeInput,
   type SubmitEvidenceInput,
+  type StartVotingInput,
   type WebhookEvent,
 } from "@suitrustpay/shared";
 
@@ -194,6 +197,63 @@ export function submitEvidence(input: SubmitEvidenceInput): Evidence {
   };
   disputes.set(dispute.id, { ...dispute, evidence: [...dispute.evidence, evidence] });
   return evidence;
+}
+
+export function startVoting(input: StartVotingInput): Dispute {
+  const dispute = disputes.get(input.disputeId);
+  if (!dispute) {
+    throw new Error("Dispute not found");
+  }
+  if (dispute.status !== "evidence") {
+    throw new Error(`Dispute is ${dispute.status}`);
+  }
+  const updated = { ...dispute, status: "voting" as const };
+  disputes.set(dispute.id, updated);
+  return updated;
+}
+
+export function castVote(input: CastVoteInput): Dispute {
+  const dispute = disputes.get(input.disputeId);
+  if (!dispute) {
+    throw new Error("Dispute not found");
+  }
+  if (dispute.status !== "voting") {
+    throw new Error(`Dispute is ${dispute.status}`);
+  }
+  if (!dispute.jury.some((juror) => juror.address === input.juror)) {
+    throw new Error("Juror is not assigned to this dispute");
+  }
+  const updated = {
+    ...dispute,
+    refundVotes: dispute.refundVotes + (input.vote === "refund" ? 1 : 0),
+    merchantVotes: dispute.merchantVotes + (input.vote === "merchant" ? 1 : 0),
+  };
+  disputes.set(dispute.id, updated);
+  return updated;
+}
+
+export function resolveDispute(input: ResolveDisputeInput): Dispute {
+  const dispute = disputes.get(input.disputeId);
+  if (!dispute) {
+    throw new Error("Dispute not found");
+  }
+  if (dispute.status !== "voting") {
+    throw new Error(`Dispute is ${dispute.status}`);
+  }
+  const order = getOrder(dispute.orderId);
+  if (!order?.escrowId) {
+    throw new Error("Escrowed order not found");
+  }
+  const refundWins = dispute.refundVotes > dispute.merchantVotes;
+  const updated = { ...dispute, status: "resolved" as const };
+  disputes.set(dispute.id, updated);
+  escrows.set(order.escrowId, {
+    ...escrows.get(order.escrowId)!,
+    status: refundWins ? "refunded" : "released",
+  });
+  updateOrder({ ...order, status: refundWins ? "refunded" : "released" });
+  saveWebhookEvent(refundWins ? "order.refunded" : "order.released", order.id, order.amount);
+  return updated;
 }
 
 export function listReputationProfiles(): ReputationProfile[] {

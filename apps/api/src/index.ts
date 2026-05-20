@@ -2,15 +2,19 @@ import { zValidator } from "@hono/zod-validator";
 import { buildPaymentIntent, chainEnvironmentFromEnv, createQuote, isQuoteExpired } from "@suitrustpay/chain";
 import {
   confirmPaymentSchema,
+  castVoteSchema,
   createDisputeSchema,
   createOrderSchema,
   quoteRequestSchema,
+  resolveDisputeSchema,
+  startVotingSchema,
   submitEvidenceSchema,
   supportedTokens,
 } from "@suitrustpay/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
+  castVote,
   confirmPayment,
   createDispute,
   createOrder,
@@ -22,8 +26,10 @@ import {
   listPayments,
   listReputationProfiles,
   listWebhookEvents,
+  resolveDispute,
   saveQuote,
   seedMerchant,
+  startVoting,
   submitEvidence,
 } from "./store";
 
@@ -112,6 +118,30 @@ app.post("/v1/evidence", zValidator("json", submitEvidenceSchema), (c) => {
     return c.json(submitEvidence(c.req.valid("json")), 201);
   } catch (error) {
     return c.json({ message: error instanceof Error ? error.message : "Unable to submit evidence" }, 400);
+  }
+});
+
+app.post("/v1/disputes/start-voting", zValidator("json", startVotingSchema), (c) => {
+  try {
+    return c.json(startVoting(c.req.valid("json")));
+  } catch (error) {
+    return c.json({ message: error instanceof Error ? error.message : "Unable to start voting" }, 400);
+  }
+});
+
+app.post("/v1/disputes/vote", zValidator("json", castVoteSchema), (c) => {
+  try {
+    return c.json(castVote(c.req.valid("json")));
+  } catch (error) {
+    return c.json({ message: error instanceof Error ? error.message : "Unable to cast vote" }, 400);
+  }
+});
+
+app.post("/v1/disputes/resolve", zValidator("json", resolveDisputeSchema), (c) => {
+  try {
+    return c.json(resolveDispute(c.req.valid("json")));
+  } catch (error) {
+    return c.json({ message: error instanceof Error ? error.message : "Unable to resolve dispute" }, 400);
   }
 });
 

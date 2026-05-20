@@ -1,9 +1,11 @@
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button, Panel } from "@suitrustpay/ui";
+import { useState } from "react";
 import type { TokenSymbol } from "@suitrustpay/shared";
 import {
   confirmPayment,
+  createDispute,
   createPaymentIntent,
   createQuote,
   getCheckoutConfig,
@@ -25,6 +27,7 @@ export function App() {
   const selectedToken = useCheckoutStore((state) => state.selectedToken);
   const setSelectedToken = useCheckoutStore((state) => state.setSelectedToken);
   const signAndExecute = useSignAndExecuteTransaction();
+  const [refundReason, setRefundReason] = useState("Service was not delivered as promised");
 
   const configQuery = useQuery({ queryKey: ["checkout-config"], queryFn: getCheckoutConfig });
   const orderQuery = useQuery({ queryKey: ["order", orderId], queryFn: () => getOrder(orderId), retry: false });
@@ -51,6 +54,18 @@ export function App() {
         quoteId: intent.quoteId,
         payer: account.address,
         txDigest: result.digest,
+      });
+    },
+  });
+  const disputeMutation = useMutation({
+    mutationFn: () => {
+      if (!account?.address) {
+        throw new Error("Connect a Sui testnet wallet before opening a refund proposal.");
+      }
+      return createDispute({
+        orderId,
+        buyer: account.address,
+        reason: refundReason,
       });
     },
   });
@@ -195,6 +210,38 @@ export function App() {
             {confirmMutation.error ? (
               <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {confirmMutation.error.message}
+              </div>
+            ) : null}
+
+            {isEscrowed ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-medium text-amber-900">Refund protection</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Open a refund proposal during the protection window. Evidence can be attached from the merchant console.
+                </p>
+                <textarea
+                  className="mt-3 min-h-20 w-full rounded-md border border-amber-200 bg-white p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-amber-400"
+                  onChange={(event) => setRefundReason(event.target.value)}
+                  value={refundReason}
+                />
+                <Button
+                  className="mt-3 w-full"
+                  disabled={disputeMutation.isPending || refundReason.length < 8}
+                  onClick={() => disputeMutation.mutate()}
+                  variant="secondary"
+                >
+                  {disputeMutation.isPending ? "Opening proposal..." : "Open refund proposal"}
+                </Button>
+                {disputeMutation.data ? (
+                  <div className="mt-3 rounded-md border border-emerald-200 bg-white p-3 text-sm text-emerald-800">
+                    Proposal opened: {disputeMutation.data.id}
+                  </div>
+                ) : null}
+                {disputeMutation.error ? (
+                  <div className="mt-3 rounded-md border border-red-200 bg-white p-3 text-sm text-red-700">
+                    {disputeMutation.error.message}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

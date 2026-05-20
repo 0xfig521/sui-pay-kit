@@ -1,4 +1,17 @@
-import type { Dispute, Escrow, Merchant, Order, Payment, ReputationProfile, WebhookEvent } from "@suitrustpay/shared";
+import type {
+  CastVoteInput,
+  Dispute,
+  Escrow,
+  Merchant,
+  Order,
+  Payment,
+  ReputationProfile,
+  ResolveDisputeInput,
+  StartVotingInput,
+  SubmitEvidenceInput,
+  Evidence,
+  WebhookEvent,
+} from "@suitrustpay/shared";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
 
@@ -41,4 +54,33 @@ export async function createDemoOrder(amount: number): Promise<Order> {
     throw new Error(payload?.message ?? "Failed to create order");
   }
   return payload as Order;
+}
+
+export async function submitEvidence(input: SubmitEvidenceInput): Promise<Evidence> {
+  return post("/v1/evidence", input);
+}
+
+export async function startVoting(input: StartVotingInput): Promise<Dispute> {
+  return post("/v1/disputes/start-voting", input);
+}
+
+export async function castVote(input: CastVoteInput): Promise<Dispute> {
+  return post("/v1/disputes/vote", input);
+}
+
+export async function resolveDispute(input: ResolveDisputeInput): Promise<Dispute> {
+  return post("/v1/disputes/resolve", input);
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.message ?? "Request failed");
+  }
+  return payload as T;
 }

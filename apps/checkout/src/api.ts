@@ -1,5 +1,7 @@
 import type {
   ConfirmPaymentInput,
+  CreateDisputeInput,
+  Dispute,
   Order,
   Payment,
   PaymentIntent,
@@ -34,6 +36,10 @@ export async function createPaymentIntent(input: QuoteRequest): Promise<PaymentI
 
 export async function confirmPayment(input: ConfirmPaymentInput): Promise<Payment> {
   return post("/v1/payments/confirm", input);
+}
+
+export async function createDispute(input: CreateDisputeInput): Promise<Dispute> {
+  return post("/v1/disputes", input);
 }
 
 async function get<T>(path: string): Promise<T> {
